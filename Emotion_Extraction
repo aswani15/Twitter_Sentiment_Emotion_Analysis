@@ -100,10 +100,6 @@ all = c(
   paste(tweets$XMod[tweets$trust > 0], collapse=" ")
 )
 
-# all = c(
-#    paste(tweets$XMod[tweets$anticipation > 0], collapse=" ")#,
-#   # paste(tweets$XMod[tweets$negative > 0], collapse=" ")
-#  )
 # clean the text
 all = clean.text(all)
 all  =  removeWords(all  ,stopwords) 
