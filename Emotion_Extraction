@@ -1,0 +1,144 @@
+library(foreign)
+library(syuzhet)
+library(lubridate)
+library(plyr)
+library(ggplot2)
+library(tm)
+library(wordcloud)
+library(hunspell)
+
+
+tweets <- read.csv('Twitter-Sachin.csv',header=TRUE,sep=';')
+
+text.clean = function(x)                    # text data
+{ require("tm")
+  x  =  gsub("<.*?>", " ", x)               # regex for removing HTML tags
+  x  =  iconv(x, "latin1", "ASCII", sub="") # Keep only ASCII characters
+  x  =  gsub("[^[:alnum:]]", " ", x)        # keep only alpha numeric 
+  x  =  tolower(x)                          # convert to lower case characters
+  x  =  removeNumbers(x)                    # removing numbers
+  #x  =  stripWhitespace(x)                  # removing white space
+  # x  =  gsub("^\\s+|\\s+$", " ", x)          # remove leading and trailing white space
+  x  =  gsub(";", " ", x) 
+  x = gsub("&amp", " ", x)
+  x = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", " ", x)
+  x = gsub("@\\w+", "", x)
+  x = gsub("[[:punct:]]", " ", x)
+  x = gsub("[[:digit:]]", " ", x)
+  # x = gsub("http?://(?:[a-z]", " ", x)
+  x = gsub("[ \t]{2,}", " ", x)
+  x = gsub("^\\s+|\\s+$", " ", x) 
+  x=  gsub("http[[:alnum:][:punct:]]*", "", x)  
+  #  x=  gsub('/\B[@#]\S+\b/', '',x)
+  # x = gsub("@*"," ",x)
+  #  x = gsub("#*"," ",x)
+  return(x)
+}
+
+
+# Read Stopwords list
+stpw1 = readLines('stopwords.txt')    
+stpw2 = tm::stopwords('english')                   # tm package stop word list; tokenizer package has the same name function
+comn  = unique(c(stpw1, stpw2))                 # Union of two list
+stopwords = unique(gsub("'"," ",comn))  # final stop word lsit after removing punctuation
+
+
+tweets$XMod  <- text.clean(tweets$date)             # pre-process text corpus
+tweets$XMod   <-  removeWords(tweets$XMod  ,stopwords) 
+
+
+#test <- c(hunspell_parse(tweets$XMod, format = "latex"))
+
+Misspellwords <- unique(unlist(hunspell_find(unlist(tweets$XMod))))
+
+#for (i in 1:nrow(tweets)) {
+  for(j in 1:length(Misspellwords)){
+    tweets$XMod <- removeWords(tweets$XMod  ,Misspellwords[j])
+  }
+  
+#}
+
+#writeLines(Misspellwords,'stopwordsunique.txt')
+#stopwords2 <-  readLines('stopwords2.txt')
+# tweets$XMod  <-  removeWords(tweets$XMod  ,stopwords2) 
+scoreSentiment = function(tab)
+{
+  tab$syuzhet = get_sentiment(tab$XMod, method="syuzhet")
+  tab$bing = get_sentiment(tab$XMod, method="bing")
+  tab$afinn = get_sentiment(tab$XMod, method="afinn")
+  tab$nrc = get_sentiment(tab$XMod, method="nrc")
+  emotions = get_nrc_sentiment(tab$XMod)
+  n = names(emotions)
+  for (nn in n) tab[, nn] = emotions[nn]
+  return(tab)
+}
+# get the sentiment scores for the tweets
+tweets = scoreSentiment(tweets)
+tweets$datesplit <- c(sapply(strsplit(as.character(tweets$date), " "), "[", 1))
+
+tweets_new <- as.data.frame(cbind(date = c(as.character(tweets$datesplit)),anger=c(tweets$anger),anticipation =c(tweets$anticipation),
+                                  disgust = c(tweets$disgust),fear = c(tweets$fear),joy=c(tweets$joy),
+                                  sadness = c(tweets$sadness),suprise =c(tweets$surprise),
+                                  trust=c(tweets$trust),negative=c(tweets$negative),positive = c(tweets$positive)))
+
+#install.packages('reshape2')
+library(reshape2)
+tweets_melt <- melt(tweets_new, id.vars=c("date"))
+
+write.csv(tweets_melt,'sentiment.csv')
+
+# emotion analysis: anger, anticipation, disgust, fear, joy, sadness, surprise, trust
+# put everything in a single vector
+all = c(
+  paste(tweets$XMod[tweets$anger > 0], collapse=" "),
+  paste(tweets$XMod[tweets$anticipation > 0], collapse=" "),
+  paste(tweets$XMod[tweets$disgust > 0], collapse=" "),
+  paste(tweets$XMod[tweets$fear > 0], collapse=" "),
+  paste(tweets$XMod[tweets$joy > 0], collapse=" "),
+  paste(tweets$XMod[tweets$sadness > 0], collapse=" "),
+  paste(tweets$XMod[tweets$surprise > 0], collapse=" "),
+  paste(tweets$XMod[tweets$trust > 0], collapse=" ")
+)
+
+# all = c(
+#    paste(tweets$XMod[tweets$anticipation > 0], collapse=" ")#,
+#   # paste(tweets$XMod[tweets$negative > 0], collapse=" ")
+#  )
+# clean the text
+all = clean.text(all)
+all  =  removeWords(all  ,stopwords) 
+
+# Misspellwords1 <- unique(unlist(hunspell_find(unlist(all))))
+# 
+# 
+# for(j in 1:length(Misspellwords)){
+#   tweets$XMod <- removeWords(tweets$XMod  ,Misspellwords[j])
+# }
+
+# remove stop-words
+# adding extra domain specific stop words
+
+#
+# create corpus
+  corpus = Corpus(VectorSource(all))
+  #
+  # create term-document matrix
+  tdm = TermDocumentMatrix(corpus)
+  #
+  # convert as matrix
+  tdm = as.matrix(tdm)
+  write.csv(tdm,'WordcloudSachin.csv')
+  #
+  # add column names
+  #colnames(tdm) = c('positive')#,'negative')
+  colnames(tdm) = c('anger', 'anticipation', 'disgust', 'fear', 'joy', 'sadness', 'surprise', 'trust')
+ # sort(colSums(tdm), decreasing = TRUE)
+  
+  # Plot comparison wordcloud
+  layout(matrix(c(1, 2), nrow=2), heights=c(1, 4))
+  par(mar=rep(0, 4))
+  plot.new()
+  text(x=0.5, y=0.5, 'Emotion Comparison Word Cloud')
+  comparison.cloud(tdm, random.order=FALSE,
+                   colors = c("#00B2FF", "red", "#FF0099", "#6600CC", "green", "orange", "blue", "brown"),
+                   title.size=1.5, max.words=500)
