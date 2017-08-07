@@ -5,11 +5,18 @@ Twitter data starting from Jan 1 2017 till Aug 1 2017 is considered for this ana
 If the algorithm can actually capture the sentiment along with emotions like Anger, Sad, Surprise, Anticipation e.t.c it will be easier for business to take correct decisions.
 
 Current attempt is to capture users emotions and sentiment on Sachin Tendulkar. Twitter data starting from 1 Jan 2017 till 1 Aug 2017 is used. Below are the use Hashtags captured 
+
+
 #godofcricket
+
 #sachinsachin
+
 #sachintendulkar
+
 #tendulkar
+
 #thankyousachin
+
 
 Stopwords are used to remove unnecessary words. “syuzhet” package is used to capture the emotion. Along with stop words non English words which essentially are the hindi/un essential words are removed from the corpus using “hunspell” package
 
